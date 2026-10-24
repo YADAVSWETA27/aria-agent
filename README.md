@@ -4,7 +4,8 @@ A browser-based voice customer support agent for a fictional D2C skincare brand.
 
 - **Live app:** https://aria-agent-sigma.vercel.app
 - **Repository:** https://github.com/YADAVSWETA27/aria-agent
-- **Demo video:** _add link here_
+- **Demo video:** https://drive.google.com/file/d/1t7kUaSGHfuUNahMuOxytN_czxvfS09Un/view?usp=sharing
+
 
 ## What it does
 
