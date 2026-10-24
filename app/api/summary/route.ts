@@ -5,7 +5,7 @@ const client = new OpenAI({
   baseURL: "https://api.groq.com/openai/v1",
 });
 
-const MODEL = "PASTE_THE_SAME_MODEL_NAME_AS_CHAT_ROUTE";
+const MODEL = "openai/gpt-oss-20b";
 
 const INSTRUCTIONS = `You analyse a finished customer support call between a customer and Aria, the voice agent of Aura Skincare. Return ONLY a JSON object with exactly these keys:
 - "customer_intent": one of ORDER_TRACKING, ORDER_CANCELLATION, RETURN_REFUND, POLICY_QUESTION, OUT_OF_SCOPE, OTHER

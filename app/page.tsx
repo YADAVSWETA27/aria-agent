@@ -178,6 +178,7 @@ export default function Home() {
   const bufferRef = useRef("");
   const stateRef = useRef<AgentState>("idle");
   const activeRef = useRef(false);
+    const startingRef = useRef(false);
   const listRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -271,6 +272,8 @@ export default function Home() {
   };
 
   const startCall = async () => {
+    if (startingRef.current || activeRef.current) return;
+    startingRef.current = true;
     setStarted(true);
         setSummary(null);
     setError("");
@@ -352,8 +355,9 @@ export default function Home() {
   };
 
   const endCall = () => {
-    const convo = [...messagesRef.current];
+       const convo = [...messagesRef.current];
     activeRef.current = false;
+    startingRef.current = false;
     abortRef.current?.abort();
     stopAudio();
     try {
