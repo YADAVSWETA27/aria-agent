@@ -9,7 +9,7 @@ const MODEL = "openai/gpt-oss-20b";
 
 const INSTRUCTIONS = `You analyse a finished customer support call between a customer and Aria, the voice agent of Aura Skincare. Return ONLY a JSON object with exactly these keys:
 - "customer_intent": one of ORDER_TRACKING, ORDER_CANCELLATION, RETURN_REFUND, POLICY_QUESTION, OUT_OF_SCOPE, OTHER
-- "order_id": the order ID discussed, like "ORD-101", or null if none
+- "order_ids": a list of every order ID discussed in the call, like ["ORD-101", "ORD-102"], or an empty list if none
 - "resolution_status": one of RESOLVED, UNRESOLVED, ESCALATED
 - "call_summary": 1 to 2 plain sentences describing what the customer wanted and what happened
 
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     if (!messages.some((m: any) => m.role === "user")) {
       return Response.json({
         customer_intent: "OTHER",
-        order_id: null,
+                order_ids: [],
         resolution_status: "UNRESOLVED",
         call_summary: "The customer ended the call without saying anything.",
       });
