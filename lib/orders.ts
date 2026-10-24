@@ -37,14 +37,26 @@ export const ORDERS: Record<string, Order> = {
     note: "Ordered 3 hours ago",
   },
 };
+const WORD_DIGITS: Record<string, string> = {
+  zero: "0", oh: "0", one: "1", two: "2", three: "3",
+  four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9",
+};
 
+// Turns "ORD-101", "ord 101", "ORD101" and "order one zero one" into "101"
+function extractDigits(raw: string) {
+  return raw
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .map((t) => WORD_DIGITS[t] ?? t.replace(/\D/g, ""))
+    .join("");
+}
 export function getOrderDetails(rawId?: string) {
   if (!rawId || !rawId.trim()) {
     return { error: "MISSING_ID", message: "No order ID was provided." };
   }
 
   // Handles "ord 101", "ORD-101", "o r d one zero one" (digits only)
-  const digits = rawId.replace(/\D/g, "");
+    const digits = extractDigits(rawId);
   const id = `ORD-${digits}`;
   const order = ORDERS[id];
 
