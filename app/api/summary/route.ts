@@ -1,4 +1,8 @@
 import OpenAI from "openai";
+import { getOrderDetails } from "@/lib/orders";
+import { SYSTEM_PROMPT } from "@/lib/prompt";
+
+export const maxDuration = 30;
 
 const client = new OpenAI({
   apiKey: process.env.GROQ_API_KEY,
@@ -7,47 +11,84 @@ const client = new OpenAI({
 
 const MODEL = "openai/gpt-oss-20b";
 
-const INSTRUCTIONS = `You analyse a finished customer support call between a customer and Aria, the voice agent of Aura Skincare. Return ONLY a JSON object with exactly these keys:
-- "customer_intent": one of ORDER_TRACKING, ORDER_CANCELLATION, RETURN_REFUND, POLICY_QUESTION, OUT_OF_SCOPE, OTHER
-- "order_ids": a list of every order ID discussed in the call, like ["ORD-101", "ORD-102"], or an empty list if none
-- "resolution_status": one of RESOLVED, UNRESOLVED, ESCALATED
-- "call_summary": 1 to 2 plain sentences describing what the customer wanted and what happened
+function cleanForSpeech(text: string) {
+  return text
+    .replace(/[\u2010-\u2015\u2212]/g, "-") // fancy hyphens/dashes -> "-"
+    .replace(/[\u00A0\u202F\u2009\u200A]/g, " ") // odd spaces -> normal space
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[*_#`]/g, "") // stray markdown
+    .trim();
+}
 
-Use RESOLVED only if the customer got a clear answer or outcome. Use UNRESOLVED if the question was not answered or the request could not be fulfilled. Use ESCALATED if the customer was told to contact the support team.`;
+const tools = [
+  {
+    type: "function" as const,
+    function: {
+      name: "get_order_details",
+      description:
+        "Look up an Aura Skincare order by its order ID (like ORD-101). Call this whenever the customer asks about the status, tracking, cancellation or return of a specific order.",
+      parameters: {
+        type: "object",
+        properties: {
+          order_id: {
+            type: "string",
+            description: "The order ID the customer gave, e.g. ORD-101",
+          },
+        },
+        required: [],
+      },
+    },
+  },
+];
 
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
+    const msgs: any[] = [{ role: "system", content: SYSTEM_PROMPT }, ...messages];
 
-    if (!messages.some((m: any) => m.role === "user")) {
-      return Response.json({
-        customer_intent: "OTHER",
-                order_ids: [],
-        resolution_status: "UNRESOLVED",
-        call_summary: "The customer ended the call without saying anything.",
+    for (let i = 0; i < 4; i++) {
+      const res = await client.chat.completions.create({
+        model: MODEL,
+        messages: msgs,
+        tools,
+        tool_choice: "auto",
+        max_tokens: 800,
+        temperature: 0.4,
+        ...({ reasoning_effort: "low" } as any),
       });
+
+      const msg = res.choices[0].message;
+
+      // No tool needed: this is Aria's final spoken reply
+      if (!msg.tool_calls || msg.tool_calls.length === 0) {
+        return Response.json({ text: cleanForSpeech(msg.content ?? "") });
+      }
+
+      // Tool needed: run it and feed the result back to the model
+      msgs.push(msg);
+      for (const call of msg.tool_calls as any[]) {
+        let args: any = {};
+        try {
+          args = JSON.parse(call.function.arguments || "{}");
+        } catch {}
+        const result = getOrderDetails(args.order_id);
+        msgs.push({
+          role: "tool",
+          tool_call_id: call.id,
+          content: JSON.stringify(result),
+        });
+      }
     }
 
-    const convo = messages
-      .map((m: any) => `${m.role === "user" ? "Customer" : "Aria"}: ${m.content}`)
-      .join("\n");
-
-    const res = await client.chat.completions.create({
-      model: MODEL,
-      messages: [
-        { role: "system", content: INSTRUCTIONS },
-        { role: "user", content: convo },
-      ],
-      temperature: 0,
-      max_tokens: 300,
-      response_format: { type: "json_object" },
+    return Response.json({
+      text: "Sorry, I'm having trouble with that. Could you please repeat?",
     });
-
-    const raw = res.choices[0].message.content ?? "{}";
-    const clean = raw.replace(/```json|```/g, "").trim();
-    return Response.json(JSON.parse(clean));
-  } catch (e) {
-    console.error("Summary error:", e);
-    return Response.json({ error: "Could not generate the summary." }, { status: 500 });
+  } catch (err) {
+    console.error("Chat error:", err);
+    return Response.json(
+      { text: "Sorry, I'm having a technical problem. Please try again." },
+      { status: 500 }
+    );
   }
 }
